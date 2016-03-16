@@ -19,7 +19,7 @@ class WNAffect:
             cwd = os.getcwd()
             nltk.data.path.append(cwd)
             wn16_path = "{0}/dict".format(wordnet16_dir)
-            self.wn16 = WordNetCorpusReader(os.path.abspath("{0}/{1}".format(cwd, wn16_path)))
+            self.wn16 = WordNetCorpusReader(os.path.abspath("{0}/{1}".format(cwd, wn16_path)), nltk.data.find(wn16_path))
             self.flat_pos = {'NN':'NN', 'NNS':'NN', 'JJ':'JJ', 'JJR':'JJ', 'JJS':'JJ', 'RB':'RB', 'RBR':'RB', 'RBS':'RB', 'VB':'VB', 'VBD':'VB', 'VGB':'VB', 'VBN':'VB', 'VBP':'VB', 'VBZ':'VB'}
             self.wn_pos = {'NN':self.wn16.NOUN, 'JJ':self.wn16.ADJ, 'VB':self.wn16.VERB, 'RB':self.wn16.ADV}
             self._load_emotions(wn_domains_dir)

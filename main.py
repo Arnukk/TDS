@@ -1,36 +1,72 @@
 __author__ = 'akarapetyan'
-from pandas import DataFrame, read_csv
-import functions
+
 import matplotlib.pyplot as plt
-import pandas as pd #this is how I usually import pandas
-import sys #only needed to determine Python version number
-import matplotlib #only needed to determine Matplotlib version number
 from wnaffect import WNAffect
 from emotion import Emotion
 from nltk.corpus import wordnet as wn
+from cursor_spinning import SpinCursor
+import time
+import sys
+import numpy as np
 
 
-"""
-Inittializing Wordnet-Affect
-@DEPENDENCIES: NLTK, WordNet 1.6 (unix-like version is utilised), WordNet-Domains 3.2
-"""
-wna = WNAffect('./wordnet-1.6/', './wn-domains-3.2/')
-
-
-def searc_database(word, year):
+def fancy_output(msg, command, starting_time, *args):
     """
-    Searches the database of 1-grams for the given word in the given year and returns the number of occurrences
-    :param word, year:
-    :return occur_count
+    Just a fancy way of outputting the progress of a command
+    @param msg, command, params: the message to output, command to be executed, params
+    @return output: the result of the command
+    """
+    spin = SpinCursor(msg=msg, minspin=5, speed=5)
+    spin.start()
+    output = command(*args)
+    if output: spin.stop()
+    sys.stdout.write("Elapsed time - %3.6f seconds" % (time.time()-starting_time))
+    print '\n'
+    return output
+
+
+def preprocess_database(year_range):
+    """
+    Filter the database of 1-grams according to the year range chosen
+    @param year_range
+    @return filtered_db
     """
     path_pattern = "data\googlebooks-eng-1M-1gram-20090715-"
-    occur_count = 0
+    filtered_db = {}
     for source in [path_pattern + '%d.csv' % i for i in range(10)]:
-        df = pd.read_csv(source, names=['word', 'year', 'occurred', 'pages', 'books'], sep='\t')
-        if len(df[(df['word'] == word) & (df['year'] == year)].index.tolist()) > 0:
-            occur_count = df.loc[[df[(df['word'] == word) & (df['year'] == year)].index.tolist()[0]]].iloc[0]['occurred']
-            print occur_count
-    return occur_count
+        #df = pd.read_csv(source, names=['word', 'year', 'occurred', 'pages', 'books'], sep='\t', error_bad_lines=False)
+        #if len(df[(df['word'] == word) & (df['year'] == year)].index.tolist()) > 0:
+            #occur_count = df.loc[[df[(df['word'] == word) & (df['year'] == year)].index.tolist()[0]]].iloc[0]['occurred']
+            #return occur_count
+        with open(source) as f:
+            for line in f:
+                data = line.split('\t')
+                if int(data[1]) in year_range:
+                    if int(data[1]) in filtered_db:
+                        filtered_db[int(data[1])].append(line)
+                    else:
+                        filtered_db[int(data[1])] = []
+                        filtered_db[int(data[1])].append(line)
+    return filtered_db
+
+
+def get_mood_score(mood, year, filtered_db):
+    """
+    Calculates the mood score of the give mood for a given year
+    :param mood, year, filtered_db:
+    :return moodscore
+    """
+    moodcount = 0
+    the_count = 0
+    for item in filtered_db[year]:
+        data = item.split('\t')
+        if data[0] in mood or data[0].lower() in mood:
+            moodcount += int(data[2])
+        if data[0] == "the" or data[0].lower() == "the":
+            the_count += int(data[2])
+    moodscore = (1.0 * moodcount/the_count)/1.0*len(mood)
+    return moodscore
+
 
 def get_emotion_terms(emotion):
     """
@@ -39,20 +75,71 @@ def get_emotion_terms(emotion):
     @return terms_array
     """
     terms_array = [emotion]
-    for term in Emotion.emotions[emotion].get_children():
+    for term in Emotion.emotions[emotion].get_children([]):
         terms_array.append(term) if term not in terms_array else None
         for synset in wn.synsets(term):
-            for lemma in synset.lemmas:
-                terms_array.append(lemma.name) if lemma.name not in terms_array else None
+            for lemma in synset.lemmas():
+                terms_array.append(str(lemma.name())) if str(lemma.name()) not in terms_array else None
     return terms_array
 
-def occurence_count(word, year, database):
-    """
-    Function for returning the number of occurrences of a word in a given year
-    @param  word, year, database: the word and the year to look in, the database of 1-grams
-    @return: count
-    """
-    pass
 
-print len(get_emotion_terms('joy'))
-searc_database('and', 1900)
+if __name__ == "__main__":
+    starting_time = time.time()
+    print "\n+++++++++++++++++++++++++++++++++++"
+    print "TDS - Assignment 1"
+    print "+++++++++++++++++++++++++++++++++++\n"
+    """
+    Inittializing Wordnet-Affect
+    @DEPENDENCIES: NLTK 3.1 or higher, WordNet 1.6 (unix-like version is utilised), WordNet-Domains 3.2
+    """
+    YEAR_RANGE = range(1900, 2001, 10)
+
+    wna = fancy_output("Initializing Wordnet", WNAffect, starting_time, './wordnet-1.6/', './wn-domains-3.2/')
+
+    joy_terms = fancy_output("Getting the terms for the mood category JOY", get_emotion_terms, starting_time, 'joy')
+
+    sadness_terms = fancy_output("Getting the terms for the mood category SADNESS", get_emotion_terms, starting_time, 'sadness')
+
+    filtered_dataset = fancy_output("Preprocessing the dataset", preprocess_database, starting_time, YEAR_RANGE)
+
+    spin = SpinCursor(msg="Computing the mood scores", minspin=5, speed=5)
+    spin.start()
+    joy_mood_scores = {}
+    sadness_mood_scores = {}
+    for year in YEAR_RANGE:
+        joy_mood_scores[year] = get_mood_score(joy_terms, year, filtered_dataset)
+        sadness_mood_scores[year] = get_mood_score(sadness_terms, year, filtered_dataset)
+    if len(joy_mood_scores) == len(YEAR_RANGE): spin.stop()
+    sys.stdout.write("Elapsed time - %3.6f seconds" % (time.time()-starting_time))
+    print '\n'
+
+    joy_mood_scores_mean = np.mean(joy_mood_scores.values())
+    joy_mood_scores_std = np.std(joy_mood_scores.values())
+
+    sadness_mood_scores_mean = np.mean(sadness_mood_scores.values())
+    sadness_mood_scores_std = np.std(sadness_mood_scores.values())
+
+    normalize = lambda mood_val: (mood_val - joy_mood_scores_mean)/(1.0 * joy_mood_scores_std)
+    joy_normalized = {}
+    for key in joy_mood_scores.keys():
+        joy_normalized[key] = normalize(joy_mood_scores[key])
+
+    normalize = lambda mood_val: (mood_val - sadness_mood_scores_mean)/(1.0 * sadness_mood_scores_std)
+    sadness_normalized = {}
+    for key in sadness_mood_scores.keys():
+        sadness_normalized[key] = normalize(sadness_mood_scores[key])
+
+    x = [year for year in YEAR_RANGE]
+    y = [joy_normalized[key] - sadness_normalized[key] for key in YEAR_RANGE]
+
+    markerline, stemlines, baseline = plt.stem(x, y, '-.')
+    plt.grid()
+    axes = plt.gca()
+    axes.set_xlim([x[0]-3, x[-1]+3])
+    plt.title('Historical periods of positive and negative moods')
+    plt.xlabel('Year')
+    plt.ylabel('Joy - Sadness (Z scores)')
+    plt.setp(markerline, 'markerfacecolor', 'b')
+    plt.setp(baseline, 'color', 'r', 'linewidth', 2)
+    print "====== Simulation finished in ", time.time() - starting_time, " seconds =========\n"
+    plt.show()
