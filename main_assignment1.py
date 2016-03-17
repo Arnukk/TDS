@@ -9,8 +9,6 @@ import time
 import sys
 import numpy as np
 import PorterStemmer as ps
-import random
-
 
 def fancy_output(msg, command, starting_time, *args):
     """
@@ -87,7 +85,7 @@ def get_emotion_terms(emotion):
 
 def get_stems():
     """
-    Returns a random array of size 9000 of the filtered stems according to the conditions mentioned in the paper
+    Returns the array of the filtered stems according to the conditions mentioned in the paper
     @return: stemarray
     """
     stemarray = []
@@ -95,7 +93,6 @@ def get_stems():
     infile = open("./part-of-speech.txt", 'r')
     while 1:
         output = ''
-        word = ''
         line = infile.readline()
         line = line.split('\t')[0]
         if line == '':
@@ -110,13 +107,13 @@ def get_stems():
                 output += c.lower()
         stemarray.append(output) if (len(output) > 2 and output not in stemarray) else None
     infile.close()
-    return random.sample(stemarray, 9000)
+    return stemarray
 
 
 if __name__ == "__main__":
     starting_time = time.time()
     print "\n+++++++++++++++++++++++++++++++++++"
-    print "TDS - Assignment 2"
+    print "TDS - Assignment 1"
     print "+++++++++++++++++++++++++++++++++++\n"
     """
     Inittializing Wordnet-Affect
@@ -126,71 +123,49 @@ if __name__ == "__main__":
 
     wna = fancy_output("Initializing Wordnet", WNAffect, starting_time, './wordnet-1.6/', './wn-domains-3.2/')
 
-    disgust_terms = fancy_output("Getting the terms for the mood category DISGUST", get_emotion_terms, starting_time, 'disgust')
+    joy_terms = fancy_output("Getting the terms for the mood category JOY", get_emotion_terms, starting_time, 'joy')
 
-    fear_terms = fancy_output("Getting the terms for the mood category FEAR", get_emotion_terms, starting_time, 'negative-fear')
-
-    rand_stems = fancy_output("Getting the random set of STEMS", get_stems, starting_time)
-
+    sadness_terms = fancy_output("Getting the terms for the mood category SADNESS", get_emotion_terms, starting_time, 'sadness')
 
     filtered_dataset = fancy_output("Preprocessing the dataset", preprocess_database, starting_time, YEAR_RANGE)
 
     spin = SpinCursor(msg="Computing the mood scores", minspin=5, speed=5)
     spin.start()
-    disgust_mood_scores = {}
-    fear_mood_scores = {}
-    rand_stems_scores = {}
+    joy_mood_scores = {}
+    sadness_mood_scores = {}
     for year in YEAR_RANGE:
-        disgust_mood_scores[year] = get_mood_score(disgust_terms, year, filtered_dataset)
-        rand_stems_scores[year] = get_mood_score(rand_stems, year, filtered_dataset)
-        fear_mood_scores[year] = get_mood_score(fear_terms, year, filtered_dataset)
-    if len(disgust_mood_scores) == len(YEAR_RANGE): spin.stop()
+        joy_mood_scores[year] = get_mood_score(joy_terms, year, filtered_dataset)
+        sadness_mood_scores[year] = get_mood_score(sadness_terms, year, filtered_dataset)
+    if len(joy_mood_scores) == len(YEAR_RANGE): spin.stop()
     sys.stdout.write("Elapsed time - %3.6f seconds" % (time.time()-starting_time))
     print '\n'
 
-    disgust_mood_scores_mean = np.mean(disgust_mood_scores.values())
-    disgust_mood_scores_std = np.std(disgust_mood_scores.values())
+    joy_mood_scores_mean = np.mean(joy_mood_scores.values())
+    joy_mood_scores_std = np.std(joy_mood_scores.values())
 
-    fear_mood_scores_mean = np.mean(fear_mood_scores.values())
-    fear_mood_scores_std = np.std(fear_mood_scores.values())
+    sadness_mood_scores_mean = np.mean(sadness_mood_scores.values())
+    sadness_mood_scores_std = np.std(sadness_mood_scores.values())
 
-    rand_stems_scores_mean = np.mean(rand_stems_scores.values())
-    rand_stems_scores_std = np.std(rand_stems_scores.values())
+    normalize = lambda mood_val: (mood_val - joy_mood_scores_mean)/(1.0 * joy_mood_scores_std)
+    joy_normalized = {}
+    for key in joy_mood_scores.keys():
+        joy_normalized[key] = normalize(joy_mood_scores[key])
 
-    normalize = lambda mood_val: (mood_val - disgust_mood_scores_mean)/(1.0 * disgust_mood_scores_std)
-    disgust_normalized = {}
-    for key in disgust_mood_scores.keys():
-        disgust_normalized[key] = normalize(disgust_mood_scores[key])
-
-    normalize = lambda mood_val: (mood_val - fear_mood_scores_mean)/(1.0 * fear_mood_scores_std)
-    fear_normalized = {}
-    for key in fear_mood_scores.keys():
-        fear_normalized[key] = normalize(fear_mood_scores[key])
-
-    normalize = lambda mood_val: (mood_val - rand_stems_scores_mean)/(1.0 * rand_stems_scores_std)
-    rand_stems_normalized = {}
-    for key in rand_stems_scores.keys():
-        rand_stems_normalized[key] = normalize(rand_stems_scores[key])
+    normalize = lambda mood_val: (mood_val - sadness_mood_scores_mean)/(1.0 * sadness_mood_scores_std)
+    sadness_normalized = {}
+    for key in sadness_mood_scores.keys():
+        sadness_normalized[key] = normalize(sadness_mood_scores[key])
 
     x = [year for year in YEAR_RANGE]
-    y = [disgust_normalized[key] - rand_stems_normalized[key] for key in YEAR_RANGE]
-    y1 = [fear_normalized[key] - rand_stems_normalized[key] for key in YEAR_RANGE]
+    y = [joy_normalized[key] - sadness_normalized[key] for key in YEAR_RANGE]
 
-    markerline, stemlines, baseline = plt.stem(x, y, '-.', label="Disgust")
-    markerline1, stemlines1, baseline = plt.stem(x, y1, '-.', label="Fear")
-
-    plt.setp(markerline1, 'markerfacecolor', 'r')
-    plt.setp(markerline, 'markerfacecolor', 'b')
-    plt.setp(baseline, 'color', 'g', 'linewidth', 2)
-    plt.setp(stemlines, linewidth=1, color=[0.08,0.4,1])
-    plt.setp(stemlines1, linewidth=1, color=[1,0.4,0.4])
+    markerline, stemlines, baseline = plt.stem(x, y, '-.')
     plt.grid()
     axes = plt.gca()
-    axes.legend()
     axes.set_xlim([x[0]-3, x[-1]+3])
-    plt.title('Decrease in the use of emotion-related words through time')
+    plt.title('Historical periods of positive and negative moods')
     plt.xlabel('Year')
-    plt.ylabel('Emotion - Random (Z scores)')
+    plt.ylabel('Joy - Sadness (Z scores)')
     plt.setp(markerline, 'markerfacecolor', 'b')
     plt.setp(baseline, 'color', 'r', 'linewidth', 2)
     print "====== Simulation finished in ", time.time() - starting_time, " seconds =========\n"
