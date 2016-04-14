@@ -72,7 +72,6 @@ def get_mood_score(mood, year, filtered_db):
     return moodscore
 
 
-
 def get_emotion_terms(emotion):
     """
     Given the emotion, the function returns all the terms related to that emotion
