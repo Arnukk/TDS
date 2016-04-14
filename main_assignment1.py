@@ -10,6 +10,10 @@ import sys
 import numpy as np
 import PorterStemmer as ps
 
+#CONSTANTS
+#array of inapproriate words to be excluded
+toexclude = ["world", "blue", "weight", "self", "hero", "identification", "will", "sympathy", "empathy", "preference", "compatibility", "softheartedness", "puppy"]
+
 def fancy_output(msg, command, starting_time, *args):
     """
     Just a fancy way of outputting the progress of a command
@@ -76,10 +80,24 @@ def get_emotion_terms(emotion):
     """
     terms_array = [emotion]
     for term in Emotion.emotions[emotion].get_children([]):
-        terms_array.append(term) if term not in terms_array else None
-        for synset in wn.synsets(term):
-            for lemma in synset.lemmas():
-                terms_array.append(str(lemma.name())) if str(lemma.name()) not in terms_array else None
+        if "-" in term:
+            for t in term.split("-"):
+                if t not in toexclude:
+                    terms_array.append(t.lower()) if t not in terms_array and t.lower() not in terms_array else None
+        else:
+            terms_array.append(term) if term not in terms_array and term.lower() not in terms_array else None
+        if "-" in term:
+            for t in term.split("-"):
+                if t not in toexclude:
+                    for synset in wn.synsets(t):
+                        for lemma in synset.lemmas():
+                            if "_" not in str(lemma.name()):
+                                terms_array.append(str(lemma.name()).lower()) if str(lemma.name()) not in terms_array and str(lemma.name()).lower() not in terms_array else None
+        else:
+            for synset in wn.synsets(term):
+                for lemma in synset.lemmas():
+                    if "_" not in str(lemma.name()):
+                        terms_array.append(str(lemma.name()).lower()) if str(lemma.name()) not in terms_array and str(lemma.name()).lower() not in terms_array else None
     return terms_array
 
 
@@ -119,11 +137,15 @@ if __name__ == "__main__":
     Inittializing Wordnet-Affect
     @DEPENDENCIES: NLTK 3.1 or higher, WordNet 1.6 (unix-like version is utilised), WordNet-Domains 3.2
     """
-    YEAR_RANGE = range(1900, 2001, 10)
+    YEAR_RANGE = range(1900, 2001, 7)
 
     wna = fancy_output("Initializing Wordnet", WNAffect, starting_time, './wordnet-1.6/', './wn-domains-3.2/')
 
     joy_terms = fancy_output("Getting the terms for the mood category JOY", get_emotion_terms, starting_time, 'joy')
+    joy_terms.extend([term for term in fancy_output("", get_emotion_terms, starting_time, 'liking') if term not in joy_terms])
+    joy_terms.extend([term for term in fancy_output("", get_emotion_terms, starting_time, 'love') if term not in joy_terms])
+    #joy_terms.extend([term for term in fancy_output("", get_emotion_terms, starting_time, 'levity') if term not in joy_terms])
+    #joy_terms.extend([term for term in fancy_output("", get_emotion_terms, starting_time, 'gratitude') if term not in joy_terms])
 
     sadness_terms = fancy_output("Getting the terms for the mood category SADNESS", get_emotion_terms, starting_time, 'sadness')
 
@@ -168,5 +190,8 @@ if __name__ == "__main__":
     plt.ylabel('Joy - Sadness (Z scores)')
     plt.setp(markerline, 'markerfacecolor', 'b')
     plt.setp(baseline, 'color', 'r', 'linewidth', 2)
+    plt.setp(stemlines, linewidth=1, color=[0.08,0.4,1])
+    plt.grid()
     print "====== Simulation finished in ", time.time() - starting_time, " seconds =========\n"
     plt.show()
+
