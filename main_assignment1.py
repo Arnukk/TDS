@@ -9,6 +9,7 @@ import time
 import sys
 import numpy as np
 import PorterStemmer as ps
+from scipy.interpolate import interp1d
 
 #CONSTANTS
 #array of inapproriate words to be excluded
@@ -137,7 +138,7 @@ if __name__ == "__main__":
     Inittializing Wordnet-Affect
     @DEPENDENCIES: NLTK 3.1 or higher, WordNet 1.6 (unix-like version is utilised), WordNet-Domains 3.2
     """
-    YEAR_RANGE = range(1900, 2001, 7)
+    YEAR_RANGE = range(1907, 2001, 4)
 
     wna = fancy_output("Initializing Wordnet", WNAffect, starting_time, './wordnet-1.6/', './wn-domains-3.2/')
 
@@ -181,10 +182,14 @@ if __name__ == "__main__":
     x = [year for year in YEAR_RANGE]
     y = [joy_normalized[key] - sadness_normalized[key] for key in YEAR_RANGE]
 
+    f2 = interp1d(x, y, kind='cubic')
+    xnew = range(1907, 2001, 2)
+
+    plt.plot(xnew, f2(xnew))
     markerline, stemlines, baseline = plt.stem(x, y, '-.')
     plt.grid()
     axes = plt.gca()
-    axes.set_xlim([x[0]-3, x[-1]+3])
+    axes.set_xlim([1897, 2003])
     plt.title('Historical periods of positive and negative moods')
     plt.xlabel('Year')
     plt.ylabel('Joy - Sadness (Z scores)')
